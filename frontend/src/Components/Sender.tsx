@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 export const Sender = () => {
     const [socket, setSocket] = useState<WebSocket | null>(null);
-    const [pc, setPC] = useState<RTCPeerConnection | null>(null);
 
     useEffect(() => {
         const ws = new WebSocket("wss://54.91.184.82:3005");
@@ -27,11 +26,8 @@ export const Sender = () => {
         }
 
         const peer = new RTCPeerConnection({
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" }
-            ]
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
         });
-        setPC(peer);
 
         peer.onicecandidate = (event) => {
             if (event.candidate) {
