@@ -6,7 +6,7 @@ export const Sender = () => {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:3005");
+    const ws = new WebSocket("wss://54.91.184.82:3005");
     setSocket(ws);
 
     ws.onopen = () => {
