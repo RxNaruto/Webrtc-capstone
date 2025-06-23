@@ -1,87 +1,80 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Sender = () => {
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-  const [pc, setPC] = useState<RTCPeerConnection | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+    const [socket, setSocket] = useState<WebSocket | null>(null);
+    const [pc, setPC] = useState<RTCPeerConnection | null>(null);
 
-  useEffect(() => {
-    const ws = new WebSocket("wss://54.91.184.82:3005");
-    setSocket(ws);
+    useEffect(() => {
+        const ws = new WebSocket("wss://54.91.184.82:3005");
+        ws.onopen = () => {
+            safeSend(ws, { type: "sender" });
+        };
+        setSocket(ws);
+    }, []);
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "sender" }));
-    };
-  }, []);
-
-  const initiateConn = async () => {
-    if (!socket) return alert("Socket not ready");
-
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    });
-    setPC(pc);
-
-    socket.onmessage = async (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === "createAnswer") {
-        await pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
-      } else if (message.type === "iceCandidate") {
-        await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
-      }
+    const safeSend = (ws: WebSocket, data: any) => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(data));
+        } else {
+            setTimeout(() => safeSend(ws, data), 100);
+        }
     };
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.send(JSON.stringify({
-          type: "iceCandidate",
-          candidate: event.candidate
-        }));
-      }
+    const initiateConn = async () => {
+        if (!socket) {
+            alert("Socket not available");
+            return;
+        }
+
+        const peer = new RTCPeerConnection({
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" }
+            ]
+        });
+        setPC(peer);
+
+        peer.onicecandidate = (event) => {
+            if (event.candidate) {
+                safeSend(socket, {
+                    type: "iceCandidate",
+                    candidate: event.candidate,
+                });
+            }
+        };
+
+        peer.onnegotiationneeded = async () => {
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+            safeSend(socket, {
+                type: "createOffer",
+                sdp: peer.localDescription,
+            });
+        };
+
+        socket.onmessage = async (event) => {
+            const message = JSON.parse(event.data);
+            if (message.type === "createAnswer") {
+                await peer.setRemoteDescription(message.sdp);
+            } else if (message.type === "iceCandidate") {
+                await peer.addIceCandidate(message.candidate);
+            }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.play();
+        document.body.appendChild(video);
+
+        stream.getTracks().forEach((track) => {
+            peer.addTrack(track, stream);
+        });
     };
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    streamRef.current = stream;
-
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    video.autoplay = true;
-    document.body.appendChild(video);
-
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-    });
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    socket.send(JSON.stringify({
-      type: "createOffer",
-      sdp: pc.localDescription
-    }));
-  };
-
-  const stopVideo = () => {
-    if (!streamRef.current) return;
-
-    // Stop all tracks
-    streamRef.current.getTracks().forEach(track => {
-      track.stop();
-    });
-
-    // Optional: Close the peer connection
-    pc?.close();
-    setPC(null);
-    streamRef.current = null;
-
-    alert("Video transmission stopped");
-  };
-
-  return (
-    <div>
-      <h1>Sender</h1>
-      <button onClick={initiateConn}>Start Video</button>
-      <button onClick={stopVideo} style={{ marginLeft: '10px' }}>Stop Video</button>
-    </div>
-  );
+    return (
+        <div>
+            <h2>Sender</h2>
+            <button onClick={initiateConn}>Send Video</button>
+        </div>
+    );
 };
