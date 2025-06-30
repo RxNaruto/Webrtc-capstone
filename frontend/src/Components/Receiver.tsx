@@ -13,18 +13,19 @@ export const Receiver = () => {
             const message = JSON.parse(event.data);
 
             if (message.type === 'createOffer') {
+                // ✅ STUN server added
                 pc = new RTCPeerConnection({
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' }
                     ]
                 });
 
-                await pc.setRemoteDescription(message.sdp);
+                pc.setRemoteDescription(message.sdp);
 
                 pc.onicecandidate = (event) => {
                     console.log(event);
                     if (event.candidate) {
-                        socket.send(JSON.stringify({ type: 'iceCandidate', candidate: event.candidate }));
+                        socket?.send(JSON.stringify({ type: 'iceCandidate', candidate: event.candidate }));
                     }
                 };
 
@@ -32,8 +33,9 @@ export const Receiver = () => {
                     console.log("Track received!", event);
                     const video = document.createElement('video');
                     video.autoplay = true;
+                    video.muted = true;
                     video.setAttribute('playsinline', 'true');
-                    video.srcObject = event.streams[0]; // Proper way to attach stream
+                    video.srcObject = new MediaStream([event.track]);
                     document.body.appendChild(video);
                 };
 
@@ -41,8 +43,9 @@ export const Receiver = () => {
                 await pc.setLocalDescription(answer);
                 socket.send(JSON.stringify({ type: "createAnswer", sdp: pc.localDescription }));
             }
-            else if (message.type === 'iceCandidate' && pc) {
-                pc.addIceCandidate(message.candidate);
+            else if (message.type === 'iceCandidate') {
+                // @ts-ignore
+                pc?.addIceCandidate(message.candidate);
             }
         };
     }, []);

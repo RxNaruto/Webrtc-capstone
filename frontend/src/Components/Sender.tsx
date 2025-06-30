@@ -14,6 +14,7 @@ export const Sender = () => {
     async function startSendingVideo() {
         if (!socket) return;
 
+        // ✅ STUN server added
         const pc = new RTCPeerConnection({
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' }
@@ -44,15 +45,7 @@ export const Sender = () => {
         };
 
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-        // Optional: Show local video preview
-        const localVideo = document.createElement('video');
-        localVideo.autoplay = true;
-        localVideo.muted = true;
-        localVideo.setAttribute('playsinline', 'true');
-        localVideo.srcObject = stream;
-        document.body.appendChild(localVideo);
+        pc.addTrack(stream.getVideoTracks()[0]);
     }
 
     return (
